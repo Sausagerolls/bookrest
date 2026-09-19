@@ -1,0 +1,15 @@
+.DS_Store
+*.xcodeproj
+*.xcworkspace
+!*.xcodeproj/project.xcworkspace
+xcuserdata/
+DerivedData/
+.build/
+.swiftpm/
+build/
+*.ipa
+*.dSYM.zip
+.icon-preview.html
+
+last prompt.rtf
+*.p8

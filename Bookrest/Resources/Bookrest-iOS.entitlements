@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- CarPlay Audio lives in Bookrest-iOS-CarPlay.entitlements. Apple grants that
+	     entitlement per App ID on request, and it cannot be enabled through the
+	     App Store Connect API, so builds default to signing without it.
+	     Once granted, build with:
+	       CODE_SIGN_ENTITLEMENTS=Bookrest/Resources/Bookrest-iOS-CarPlay.entitlements
+	     The CarPlay code ships either way; the scene simply never connects. -->
+</dict>
+</plist>

@@ -1,0 +1,140 @@
+name: Bookrest
+options:
+  bundleIdPrefix: com.bookrest
+  createIntermediateGroups: true
+  deploymentTarget:
+    iOS: "18.0"
+    macOS: "15.0"
+  groupSortPosition: top
+  generateEmptyDirectories: false
+
+packages:
+  BookrestKit:
+    path: Packages/BookrestKit
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    DEVELOPMENT_TEAM: J4UJD4Z33J
+    CODE_SIGN_STYLE: Automatic
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    SWIFT_EMIT_LOC_STRINGS: YES
+
+targets:
+  Bookrest:
+    type: application
+    supportedDestinations: [iOS, macOS]
+    sources:
+      - path: Bookrest
+    dependencies:
+      - package: BookrestKit
+        product: BookrestCore
+      - package: BookrestKit
+        product: ABSClient
+    info:
+      path: Bookrest/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: Bookrest
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        LSApplicationCategoryType: public.app-category.books
+        ITSAppUsesNonExemptEncryption: false
+        # Self-hosted servers are commonly reached over plain HTTP on a home
+        # network, so Bookrest cannot require TLS for every connection.
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+          NSAllowsLocalNetworking: true
+        NSLocalNetworkUsageDescription: >-
+          Bookrest connects to your Audiobookshelf server, which may be running on
+          your local network.
+        # Only `audio`. Background downloads run on a background URLSession, which
+        # needs no background mode, and nothing registers BGTaskScheduler work —
+        # declaring `fetch`/`processing` without it fails App Store validation.
+        UIBackgroundModes:
+          - audio
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UISupportedInterfaceOrientations~iphone:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        # Only the CarPlay role is declared: SwiftUI creates and owns the regular
+        # window scene itself, and listing it here would displace that.
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: true
+          UISceneConfigurations:
+            CPTemplateApplicationSceneSessionRoleApplication:
+              - UISceneConfigurationName: Bookrest CarPlay
+                UISceneDelegateClassName: "$(PRODUCT_MODULE_NAME).CarPlaySceneDelegate"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.giantmushroom.bookrest
+        PRODUCT_NAME: Bookrest
+        INFOPLIST_KEY_CFBundleDisplayName: Bookrest
+        GENERATE_INFOPLIST_FILE: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ENABLE_PREVIEWS: YES
+        SUPPORTS_MACCATALYST: NO
+        "CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]": Bookrest/Resources/Bookrest-iOS.entitlements
+        "CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]": Bookrest/Resources/Bookrest-iOS.entitlements
+        "CODE_SIGN_ENTITLEMENTS[sdk=macosx*]": Bookrest/Resources/Bookrest-macOS.entitlements
+        "INFOPLIST_KEY_LSApplicationCategoryType[sdk=macosx*]": public.app-category.books
+  # Runs the real engine on a real iOS runtime. macOS has no AVAudioSession and
+  # seeks local files instantly, so playback bugs that only appear on iOS need this.
+  DevicePlaybackTests:
+    type: bundle.unit-test
+    supportedDestinations: [iOS]
+    sources:
+      - path: Tests/DevicePlaybackTests
+    dependencies:
+      - package: BookrestKit
+        product: BookrestCore
+      - package: BookrestKit
+        product: ABSClient
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.giantmushroom.bookrest.playbacktests
+        CODE_SIGNING_ALLOWED: NO
+
+  # Drives the real UI. The engine-level tests all pass, so a failure that only
+  # appears in the app has to be reproduced through the views.
+  AppFlowUITests:
+    type: bundle.ui-testing
+    supportedDestinations: [iOS]
+    sources:
+      - path: Tests/AppFlowUITests
+    dependencies:
+      - target: Bookrest
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.giantmushroom.bookrest.uitests
+        TEST_TARGET_NAME: Bookrest
+
+schemes:
+  Bookrest:
+    build:
+      targets:
+        Bookrest: all
+        DevicePlaybackTests: [test]
+        AppFlowUITests: [test]
+    test:
+      config: Debug
+      targets:
+        - DevicePlaybackTests
+        - AppFlowUITests
+    run:
+      config: Debug
+    archive:
+      config: Release
