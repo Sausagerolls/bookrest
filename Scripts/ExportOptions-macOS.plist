@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>method</key>
+	<string>app-store-connect</string>
+	<key>destination</key>
+	<string>export</string>
+	<!-- Manual, not automatic. Xcode's cloud signing fails here with "Cloud signing
+	     permission error" even though the API key can create the assets itself, so the
+	     certificate and profile are provisioned via the API and named explicitly. -->
+	<key>signingStyle</key>
+	<string>manual</string>
+	<key>teamID</key>
+	<string>__TEAM_ID__</string>
+	<key>signingCertificate</key>
+	<string>Apple Distribution</string>
+	<key>provisioningProfiles</key>
+	<dict>
+		<key>com.giantmushroom.bookrest</key>
+		<string>Bookrest Mac App Store</string>
+	</dict>
+	<key>installerSigningCertificate</key>
+	<string>3rd Party Mac Developer Installer</string>
+	<key>uploadSymbols</key>
+	<true/>
+	<key>manageAppVersionAndBuildNumber</key>
+	<false/>
+</dict>
+</plist>

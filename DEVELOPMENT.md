@@ -216,6 +216,18 @@ and `ExportOptions.plist` names them explicitly:
 Both are installed on the release machine. When either expires, recreate via the API rather
 than switching back to automatic signing.
 
+### Mac App Store builds
+
+```sh
+./Scripts/appstore-mac.sh      # same environment variables as testflight.sh
+```
+
+Archives for macOS, exports a signed `.pkg`, validates and uploads. Signing is manual
+like iOS: `ExportOptions-macOS.plist` names the **Bookrest Mac App Store** profile
+(`MAC_APP_STORE`, expires 2027-09-02) and needs both the Apple Distribution and
+**3rd Party Mac Developer Installer** identities in the keychain. The bundle ID is
+registered as `UNIVERSAL`, so iOS and macOS share one App Store record.
+
 ### Background modes
 
 `UIBackgroundModes` is **`audio` only**. Background downloads run on a background
