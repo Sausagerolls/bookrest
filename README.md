@@ -31,12 +31,12 @@ books, progress and login stay between your device and your server.
 Found a bug or have a question? [Open an issue](https://github.com/Sausagerolls/bookrest/issues).
 Please include your device, OS version, app version and Audiobookshelf server version.
 
-See [Support](https://sausagerolls.github.io/bookrest/support) for common problems.
+See [SUPPORT.md](SUPPORT.md) for common problems.
 
 ## Privacy
 
 Bookrest collects no data. It talks only to the server you sign in to. Read the full
-[Privacy Policy](https://sausagerolls.github.io/bookrest/privacy).
+[Privacy Policy](PRIVACY.md).
 
 ## Building from source
 

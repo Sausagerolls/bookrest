@@ -1,7 +1,3 @@
----
-title: Privacy Policy
----
-
 # Bookrest Privacy Policy
 
 *Last updated: 19 September 2026*

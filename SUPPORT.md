@@ -1,7 +1,3 @@
----
-title: Support
----
-
 # Bookrest Support
 
 ## Get help

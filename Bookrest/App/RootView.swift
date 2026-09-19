@@ -81,7 +81,13 @@ struct RootView: View {
     @ViewBuilder
     private func hostingMiniPlayer(_ tabs: some View) -> some View {
         #if os(iOS)
-        if #available(iOS 26.0, *) {
+        if #available(iOS 26.1, *) {
+            // Hidden until something is loaded; otherwise the system draws an
+            // empty glass bar above the tab bar.
+            tabs.tabViewBottomAccessory(isEnabled: environment.player.context != nil) {
+                MiniPlayerContent(isShowingPlayer: $isShowingPlayer)
+            }
+        } else if #available(iOS 26.0, *) {
             tabs.tabViewBottomAccessory {
                 MiniPlayerContent(isShowingPlayer: $isShowingPlayer)
             }
