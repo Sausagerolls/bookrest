@@ -88,7 +88,18 @@ public struct Series: Decodable, Hashable, Identifiable, Sendable {
     public let addedAt: Date?
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, nameIgnorePrefix, description, books, totalDuration, addedAt
+        case id, name, nameIgnorePrefix, description, books, items, totalDuration, addedAt
+    }
+
+    /// A bare reference, e.g. from a book's series link; the detail screen loads the books.
+    public init(id: String, name: String) {
+        self.id = id
+        self.name = name
+        nameIgnorePrefix = nil
+        description = nil
+        books = []
+        totalDuration = 0
+        addedAt = nil
     }
 
     public init(from decoder: Decoder) throws {
@@ -97,7 +108,9 @@ public struct Series: Decodable, Hashable, Identifiable, Sendable {
         name = c.lenient(.name, default: "")
         nameIgnorePrefix = c.lenient(.nameIgnorePrefix)
         description = c.lenient(.description)
-        books = c.lenientArray(.books)
+        // The author endpoint groups books into series under `items` instead of `books`.
+        let listed: [LibraryItem] = c.lenientArray(.books)
+        books = listed.isEmpty ? c.lenientArray(.items) : listed
         let loaded = books
         totalDuration = c.lenient(.totalDuration) ?? loaded.reduce(0) { $0 + $1.duration }
         addedAt = ABSDate.from(milliseconds: c.lenient(.addedAt))
@@ -106,19 +119,28 @@ public struct Series: Decodable, Hashable, Identifiable, Sendable {
     public var sortName: String { nameIgnorePrefix ?? name }
     public var bookCount: Int { books.count }
 
-    /// Series order as the author intended: by sequence number where present,
-    /// then by title for the unnumbered stragglers.
     public var orderedBooks: [LibraryItem] {
-        books.sorted { lhs, rhs in
-            let l = lhs.seriesRefs.first(where: { $0.id == id })?.sortValue
-            let r = rhs.seriesRefs.first(where: { $0.id == id })?.sortValue
-            switch (l, r) {
+        books.inSeriesOrder(seriesId: id, seriesName: name)
+    }
+}
+
+extension Array where Element == LibraryItem {
+    /// Series order as the author intended: by sequence number where present.
+    /// Unnumbered books go last in the order they arrived, because the server already
+    /// sends series books in reading order and often without their numbers.
+    public func inSeriesOrder(seriesId: String, seriesName: String?) -> [LibraryItem] {
+        let keyed = enumerated().map { offset, book -> (book: LibraryItem, offset: Int, number: Double?) in
+            let sequence = book.sequence(inSeries: seriesId, named: seriesName)
+            return (book, offset, sequence.flatMap { Double($0.trimmingCharacters(in: .whitespaces)) })
+        }
+        return keyed.sorted { lhs, rhs in
+            switch (lhs.number, rhs.number) {
             case let (l?, r?) where l != r: return l < r
             case (nil, .some): return false
             case (.some, nil): return true
-            default: return lhs.sortTitle.localizedStandardCompare(rhs.sortTitle) == .orderedAscending
+            default: return lhs.offset < rhs.offset
             }
-        }
+        }.map(\.book)
     }
 }
 
@@ -129,9 +151,22 @@ public struct Author: Decodable, Hashable, Identifiable, Sendable {
     public let imagePath: String?
     public let numBooks: Int
     public let libraryItems: [LibraryItem]
+    /// Only present when fetched with `include=items,series`.
+    public let series: [Series]
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, description, imagePath, numBooks, libraryItems
+        case id, name, description, imagePath, numBooks, libraryItems, series
+    }
+
+    /// A bare reference, e.g. from a book's author link; the detail screen loads the rest.
+    public init(id: String, name: String) {
+        self.id = id
+        self.name = name
+        description = nil
+        imagePath = nil
+        numBooks = 0
+        libraryItems = []
+        series = []
     }
 
     public init(from decoder: Decoder) throws {
@@ -143,6 +178,15 @@ public struct Author: Decodable, Hashable, Identifiable, Sendable {
         libraryItems = c.lenientArray(.libraryItems)
         let items = libraryItems
         numBooks = c.lenient(.numBooks) ?? items.count
+        series = c.lenientArray(.series)
+    }
+
+    /// Books that belong to none of the author's series, alphabetically.
+    public var standaloneBooks: [LibraryItem] {
+        let inSeries = Set(series.flatMap { $0.books.map(\.id) })
+        return libraryItems
+            .filter { !inSeries.contains($0.id) }
+            .sorted { $0.sortTitle.localizedStandardCompare($1.sortTitle) == .orderedAscending }
     }
 
     public var hasImage: Bool { !(imagePath ?? "").isEmpty }

@@ -91,4 +91,81 @@ struct SeriesOrderingTests {
         // 1, 1.5, 2, 10 numerically — then the unnumbered entry last.
         #expect(order == ["b1", "b2", "b3", "b10", "bx"])
     }
+
+    @Test("Minified series payloads order by top-level sequence or flattened series name")
+    func minifiedOrdering() throws {
+        let series = try JSONDecoder().decode(Series.self, from: Data("""
+        {
+          "id": "ser_1", "name": "Saga",
+          "books": [
+            {"id": "b3", "sequence": "3", "mediaType": "book",
+              "media": {"metadata": {"title": "A Third", "seriesName": "Saga #3"}}},
+            {"id": "b1", "mediaType": "book",
+              "media": {"metadata": {"title": "Z First", "seriesName": "Other #9, Saga #1"}}},
+            {"id": "b2", "sequence": 2, "mediaType": "book",
+              "media": {"metadata": {"title": "M Second"}}}
+          ]
+        }
+        """.utf8))
+
+        #expect(series.orderedBooks.map(\.id) == ["b1", "b2", "b3"])
+        #expect(series.books.first { $0.id == "b1" }?.sequence(inSeries: "ser_1", named: "Saga") == "1")
+    }
+
+    @Test("A single series object, as series-filtered listings send, decodes as one ref")
+    func singleSeriesObject() throws {
+        let item = try JSONDecoder().decode(LibraryItem.self, from: Data("""
+        {"id": "b1", "mediaType": "book", "media": {"metadata": {"title": "One",
+          "series": {"id": "ser_1", "name": "Saga", "sequence": "4"}}}}
+        """.utf8))
+        #expect(item.sequence(inSeries: "ser_1") == "4")
+    }
+
+    @Test("Books without numbers keep the server's order instead of sorting by title")
+    func unnumberedKeepServerOrder() throws {
+        let series = try JSONDecoder().decode(Series.self, from: Data("""
+        {
+          "id": "ser_1", "name": "Dungeon Crawler Carl",
+          "books": [
+            {"id": "b1", "mediaType": "book", "media": {"metadata": {"title": "Dungeon Crawler Carl"}}},
+            {"id": "b2", "mediaType": "book", "media": {"metadata": {"title": "Carl's Doomsday Scenario"}}},
+            {"id": "b3", "mediaType": "book", "media": {"metadata": {"title": "The Dungeon Anarchist's Cookbook"}}}
+          ]
+        }
+        """.utf8))
+        #expect(series.orderedBooks.map(\.id) == ["b1", "b2", "b3"])
+    }
+
+    @Test("Series-filtered listings carry the number in a top-level series object")
+    func topLevelSeriesObject() throws {
+        let item = try JSONDecoder().decode(LibraryItem.self, from: Data("""
+        {"id": "b2", "mediaType": "book", "series": {"id": "ser_1", "name": "Saga", "sequence": "2"},
+          "media": {"metadata": {"title": "Two", "seriesName": ""}}}
+        """.utf8))
+        #expect(item.sequence(inSeries: "ser_1") == "2")
+        #expect(item.sequence(inSeries: "ser_other") == nil)
+    }
+
+    @Test("Author payloads group books into ordered series, leaving standalone books apart")
+    func authorSeries() throws {
+        let author = try JSONDecoder().decode(Author.self, from: Data("""
+        {
+          "id": "aut_1", "name": "Matt Dinniman",
+          "libraryItems": [
+            {"id": "b2", "mediaType": "book", "media": {"metadata": {"title": "Carl's Doomsday Scenario"}}},
+            {"id": "s1", "mediaType": "book", "media": {"metadata": {"title": "Kaiju"}}},
+            {"id": "b1", "mediaType": "book", "media": {"metadata": {"title": "Dungeon Crawler Carl"}}}
+          ],
+          "series": [{"id": "ser_1", "name": "Dungeon Crawler Carl", "items": [
+            {"id": "b2", "mediaType": "book", "media": {"metadata": {"title": "Carl's Doomsday Scenario",
+              "series": {"id": "ser_1", "name": "Dungeon Crawler Carl", "sequence": "2"}}}},
+            {"id": "b1", "mediaType": "book", "media": {"metadata": {"title": "Dungeon Crawler Carl",
+              "series": {"id": "ser_1", "name": "Dungeon Crawler Carl", "sequence": "1"}}}}
+          ]}]
+        }
+        """.utf8))
+        #expect(author.series.map(\.id) == ["ser_1"])
+        #expect(author.series[0].orderedBooks.map(\.id) == ["b1", "b2"])
+        #expect(author.standaloneBooks.map(\.id) == ["s1"])
+    }
 }

@@ -176,9 +176,8 @@ final class CarPlayCoordinator {
     }
 
     private func pushSeries(_ series: Series, libraryId: String) async {
-        let books = series.books.isEmpty
-            ? ((try? await environment.client.books(inSeries: series.id, libraryId: libraryId)) ?? [])
-            : series.orderedBooks
+        let fetched = (try? await environment.client.books(inSeries: series.id, named: series.name, libraryId: libraryId)) ?? []
+        let books = fetched.isEmpty ? series.orderedBooks : fetched
 
         let template = CPListTemplate(
             title: series.name,

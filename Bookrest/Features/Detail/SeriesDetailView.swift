@@ -8,8 +8,8 @@ struct SeriesDetailView: View {
     @State private var books: [LibraryItem] = []
     @State private var isLoading = true
 
-    /// Prefer books already attached to the series object; only hit the network when
-    /// the payload was minified.
+    /// Show books already attached to the series object straight away, then swap in the
+    /// series-filtered listing, which is the only payload that reliably carries book numbers.
     private var displayed: [LibraryItem] {
         books.isEmpty ? series.orderedBooks : books
     }
@@ -32,7 +32,7 @@ struct SeriesDetailView: View {
                             NavigationLink(value: book) {
                                 VStack(alignment: .leading, spacing: 4) {
                                     BookCard(item: book, showsAuthor: false)
-                                    if let sequence = book.seriesRefs.first(where: { $0.id == series.id })?.sequence {
+                                    if let sequence = book.sequence(inSeries: series.id, named: series.name) {
                                         Text("Book \(sequence)")
                                             .font(.caption2)
                                             .foregroundStyle(.tertiary)
@@ -57,8 +57,8 @@ struct SeriesDetailView: View {
 
     private func load() async {
         defer { isLoading = false }
-        guard series.books.isEmpty, let libraryId = environment.selectedLibraryId else { return }
-        books = (try? await environment.client.books(inSeries: series.id, libraryId: libraryId)) ?? []
+        guard let libraryId = environment.selectedLibraryId else { return }
+        books = (try? await environment.client.books(inSeries: series.id, named: series.name, libraryId: libraryId)) ?? []
     }
 }
 
@@ -66,41 +66,66 @@ struct AuthorDetailView: View {
     let author: Author
 
     @Environment(AppEnvironment.self) private var environment
+    /// The author fetched with their books grouped into series.
+    @State private var loaded: Author?
+    /// Fallback when the author endpoint isn't reachable: the flat filtered listing.
     @State private var books: [LibraryItem] = []
     @State private var isLoading = true
 
-    private var displayed: [LibraryItem] {
-        books.isEmpty ? author.libraryItems : books
+    private var displayed: Author { loaded ?? author }
+
+    private var series: [Series] {
+        displayed.series.sorted { $0.sortName.localizedStandardCompare($1.sortName) == .orderedAscending }
+    }
+
+    private var standalone: [LibraryItem] {
+        if loaded != nil { return displayed.standaloneBooks }
+        let flat = books.isEmpty ? author.libraryItems : books
+        return flat.sorted { $0.sortTitle.localizedStandardCompare($1.sortTitle) == .orderedAscending }
     }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 HStack(alignment: .top, spacing: 16) {
-                    AvatarImage(url: author.hasImage ? environment.authorImageURL(for: author.id) : nil,
-                                name: author.name, size: 88)
+                    AvatarImage(url: displayed.hasImage ? environment.authorImageURL(for: displayed.id) : nil,
+                                name: displayed.name, size: 88)
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(author.name).font(.title3.weight(.semibold))
-                        Text("\(author.numBooks) book\(author.numBooks == 1 ? "" : "s")")
-                            .font(.caption).foregroundStyle(.secondary)
+                        Text(displayed.name).font(.title3.weight(.semibold))
+                        if displayed.numBooks > 0 {
+                            Text("\(displayed.numBooks) book\(displayed.numBooks == 1 ? "" : "s")")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
                     }
                     Spacer()
                 }
 
-                if let description = author.description, !description.isEmpty {
+                if let description = displayed.description, !description.isEmpty {
                     Text(description)
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                if isLoading && displayed.isEmpty {
+                if isLoading && series.isEmpty && standalone.isEmpty {
                     ProgressView().frame(maxWidth: .infinity).padding(.top, 40)
                 } else {
-                    CoverGrid {
-                        ForEach(displayed) { book in
-                            NavigationLink(value: book) { BookCard(item: book, showsAuthor: false) }
-                                .buttonStyle(.plain)
+                    if !series.isEmpty {
+                        sectionHeader("Series")
+                        CoverGrid {
+                            ForEach(series) { series in
+                                NavigationLink(value: series) { SeriesCard(series: series) }
+                                    .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    if !standalone.isEmpty {
+                        if !series.isEmpty { sectionHeader("Other Books") }
+                        CoverGrid {
+                            ForEach(standalone) { book in
+                                NavigationLink(value: book) { BookCard(item: book, showsAuthor: false) }
+                                    .buttonStyle(.plain)
+                            }
                         }
                     }
                 }
@@ -108,7 +133,7 @@ struct AuthorDetailView: View {
             .padding(.horizontal)
             .padding(.bottom, 30)
         }
-        .navigationTitle(author.name)
+        .navigationTitle(displayed.name)
         #if !os(macOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
@@ -116,10 +141,18 @@ struct AuthorDetailView: View {
         .navigationDestination(for: LibraryItem.self) { ItemDetailView(itemId: $0.id, preview: $0) }
     }
 
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title).font(.headline).padding(.top, 4)
+    }
+
     private func load() async {
         defer { isLoading = false }
-        guard author.libraryItems.isEmpty, let libraryId = environment.selectedLibraryId else { return }
-        books = (try? await environment.client.books(byAuthor: author.id, libraryId: libraryId)) ?? []
+        guard let libraryId = environment.selectedLibraryId else { return }
+        if let fetched = try? await environment.client.author(author.id, libraryId: libraryId) {
+            loaded = fetched
+        } else if author.libraryItems.isEmpty {
+            books = (try? await environment.client.books(byAuthor: author.id, libraryId: libraryId)) ?? []
+        }
     }
 }
 

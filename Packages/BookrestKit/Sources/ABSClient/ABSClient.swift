@@ -153,14 +153,16 @@ public final class AudiobookshelfClient: Sendable {
     }
 
     /// Books in one series, in reading order.
-    public func books(inSeries seriesId: String, libraryId: String) async throws -> [LibraryItem] {
+    public func books(inSeries seriesId: String, named seriesName: String? = nil,
+                      libraryId: String) async throws -> [LibraryItem] {
         let page = try await items(
             inLibrary: libraryId,
             limit: 500,
             sort: .seriesSequence,
             filter: .series(seriesId)
         )
-        return page.results
+        // Don't trust the server's sort alone; older versions ignore it for minified listings.
+        return page.results.inSeriesOrder(seriesId: seriesId, seriesName: seriesName)
     }
 
     public func authors(inLibrary libraryId: String) async throws -> [Author] {

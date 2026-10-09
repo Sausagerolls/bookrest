@@ -156,10 +156,16 @@ public struct LibraryItem: Decodable, Hashable, Identifiable, Sendable {
     /// Some endpoints (personalized shelves, `include=progress`) inline the caller's progress.
     public let userMediaProgress: MediaProgress?
     public let collapsedSeries: CollapsedSeries?
+    /// Series listings attach the book's number at the top level of the item, either as
+    /// a bare `sequence` or, when filtering by series, as a `series` object.
+    private let seriesSequence: String?
+    private let filteredSeries: SeriesRef?
 
     private enum CodingKeys: String, CodingKey {
         case id, libraryId, folderId, addedAt, updatedAt, isMissing, isInvalid
         case mediaType, media, numFiles, size, userMediaProgress, collapsedSeries
+        case seriesSequence = "sequence"
+        case filteredSeries = "series"
     }
 
     public init(from decoder: Decoder) throws {
@@ -175,6 +181,8 @@ public struct LibraryItem: Decodable, Hashable, Identifiable, Sendable {
         size = c.lenient(.size)
         userMediaProgress = c.lenientValue(.userMediaProgress)
         collapsedSeries = c.lenientValue(.collapsedSeries)
+        seriesSequence = c.lenient(.seriesSequence)
+        filteredSeries = c.lenientValue(.filteredSeries)
 
         let rawMediaType: String = c.lenient(.mediaType, default: MediaType.book.rawValue)
         let resolvedType = MediaType(rawValue: rawMediaType) ?? .book
@@ -225,6 +233,13 @@ extension LibraryItem {
     public var seriesRefs: [SeriesRef] { media.book?.metadata.series ?? [] }
 
     public var seriesDisplay: String? { media.book?.metadata.seriesDisplay }
+
+    /// Book number within the given series, from whichever field the payload carried.
+    public func sequence(inSeries seriesId: String, named seriesName: String? = nil) -> String? {
+        media.book?.metadata.sequence(inSeries: seriesId, named: seriesName)
+            ?? filteredSeries.flatMap { $0.id == seriesId ? $0.sequence?.nilIfEmpty : nil }
+            ?? seriesSequence?.nilIfEmpty
+    }
 
     public var itemDescription: String? {
         switch media {

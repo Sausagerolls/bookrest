@@ -69,7 +69,15 @@ struct ItemDetailView: View {
                     Text(subtitle).font(.subheadline).foregroundStyle(.secondary)
                 }
 
-                if let author = item.authorDisplay {
+                if let authors = item.media.book?.metadata.authors, !authors.isEmpty {
+                    ForEach(authors) { author in
+                        NavigationLink(value: Author(id: author.id, name: author.name)) {
+                            Text(author.name).font(.subheadline).foregroundStyle(.tint)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                } else if let author = item.authorDisplay {
+                    // Minified previews only carry the flattened name until the full item loads.
                     Text(author).font(.subheadline).foregroundStyle(.secondary)
                 }
 
@@ -80,9 +88,12 @@ struct ItemDetailView: View {
 
                 if !item.seriesRefs.isEmpty {
                     ForEach(item.seriesRefs) { series in
-                        Text(series.displayLabel)
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(.tint)
+                        NavigationLink(value: Series(id: series.id, name: series.name)) {
+                            Text(series.displayLabel)
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(.tint)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
 

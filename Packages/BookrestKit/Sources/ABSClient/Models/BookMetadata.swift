@@ -86,7 +86,9 @@ public struct BookMetadata: Decodable, Hashable, Sendable {
         subtitle = c.lenient(.subtitle)
         authors = c.lenientArray(.authors)
         narrators = c.lenientArray(.narrators)
-        series = c.lenientArray(.series)
+        // Series-filtered listings send a single object for the series being browsed.
+        let seriesList: [SeriesRef] = c.lenientArray(.series)
+        series = seriesList.isEmpty ? (c.lenientValue(.series) as SeriesRef?).map { [$0] } ?? [] : seriesList
         genres = c.lenientArray(.genres)
         publishedYear = c.lenient(.publishedYear)
         publisher = c.lenient(.publisher)
@@ -116,6 +118,17 @@ public struct BookMetadata: Decodable, Hashable, Sendable {
     public var seriesDisplay: String? {
         if !series.isEmpty { return series.map(\.displayLabel).joined(separator: ", ") }
         return seriesNameFallback?.nilIfEmpty
+    }
+
+    /// Book number within one series. Falls back to parsing the flattened
+    /// "Name #3, Other #1" string that minified payloads carry instead of `series`.
+    public func sequence(inSeries seriesId: String, named seriesName: String?) -> String? {
+        if let ref = series.first(where: { $0.id == seriesId }) { return ref.sequence?.nilIfEmpty }
+        guard let seriesName, !seriesName.isEmpty, let flattened = seriesNameFallback,
+              let marker = flattened.range(of: "\(seriesName) #") else { return nil }
+        let rest = flattened[marker.upperBound...]
+        let sequence = rest.prefix { $0 != "," }.trimmingCharacters(in: .whitespaces)
+        return sequence.nilIfEmpty
     }
 
     /// Title used for alphabetical sorting; the server precomputes a version with
